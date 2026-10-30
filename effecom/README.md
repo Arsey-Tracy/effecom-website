@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Effecom
 
-## Getting Started
+A Uganda-focused public marketing website for Effecom, a Nexus Care initiative
+exploring more accessible healthcare communication for deaf and
+hard-of-hearing people.
 
-First, run the development server:
+## Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The site uses Next.js App Router, TypeScript, Tailwind CSS, and the project's
+shadcn UI components.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Pilot registration integration
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The interest form is **not connected by default**. When no endpoint is
+configured, the site explains that details will not be submitted or stored,
+and the API route returns `503` without forwarding any information.
 
-## Learn More
+To connect a registration service:
 
-To learn more about Next.js, take a look at the following resources:
+1. Add `EFFECOM_REGISTRATION_ENDPOINT` to the server environment before
+   building or starting the site. It must be an HTTPS URL (HTTP is allowed
+   only for `localhost` during development).
+2. The endpoint must accept a JSON `POST` with `name`,
+   `contact_method` (`email` or `phone`), `contact`, optional `district`,
+   optional `communication_preference`, and `consent`.
+3. If the endpoint requires a bearer token, set
+   `EFFECOM_REGISTRATION_API_KEY` as a server-only environment variable. Do
+   not prefix it with `NEXT_PUBLIC_`.
+4. Confirm the receiving service's data handling, retention, access controls,
+   and failure behaviour. The website considers any 2xx response a received
+   registration and does not store submitted details itself.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The form submits to the site's `/api/pilot-interest` route. That server route
+validates the fields and forwards only the form data to the configured
+endpoint. It does not write details to local storage, a database, or logs.
+Submissions time out after 10 seconds. Provider errors are reported as
+failures, not as successful registrations.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Owner review before launch
 
-## Deploy on Vercel
+- Confirm each feature status in `lib/site-content.ts`. Current feature labels
+  are conservatively set to **Planned**; no feature has been verified as
+  available.
+- Set a real privacy contact channel in `lib/site-content.ts` and publish an
+  operational way for people to ask about, correct, or request removal of
+  information before connecting registrations.
+- Have the draft privacy notice reviewed for the actual registration
+  provider, retention period, and applicable requirements.
+- Confirm the content, pilot process, and any future imagery with the
+  community. The hero visual is an illustration of a concept, not a working
+  product or a Uganda Sign Language demonstration.
+- Add the production domain to metadata only once it is confirmed. No
+  canonical URL or sitemap domain is currently configured.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Checks
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+```
