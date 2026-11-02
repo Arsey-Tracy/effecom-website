@@ -21,17 +21,21 @@ const jetBrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Effecom | Accessible healthcare communication in Uganda",
-    template: "%s | Effecom",
+    default: "EFFECOM | Communication without barriers",
+    template: "%s | EFFECOM",
   },
   description:
-    "Effecom is building more accessible ways for deaf and hard-of-hearing people in Uganda to communicate in healthcare settings.",
+    "EFFECOM makes communication more accessible with text-to-speech, speech-to-text, language translation, and video captions.",
+  icons: {
+    icon: "/effecomlogo.jpeg",
+    apple: "/effecomlogo.jpeg",
+  },
   openGraph: {
     type: "website",
-    title: "Effecom | Accessible healthcare communication in Uganda",
+    title: "EFFECOM | Communication without barriers",
     description:
-      "A Uganda-focused initiative exploring more accessible healthcare communication with deaf and hard-of-hearing people.",
-    siteName: "Effecom",
+      "Every voice deserves to be understood. Explore practical tools for more accessible communication.",
+    siteName: "EFFECOM",
   },
 };
 
