@@ -1,6 +1,16 @@
-const apiBaseUrl = (
-  process.env.NEXT_PUBLIC_EFFECOM_API_URL ?? "http://localhost:8000"
-).replace(/\/+$/, "");
+const isProduction = process.env.NODE_ENV === "production";
+const defaultApiBaseUrl = isProduction
+  ? "https://effecom-backend.onrender.com"
+  : "http://localhost:8000";
+const configuredApiBaseUrl = process.env.NEXT_PUBLIC_EFFECOM_API_URL;
+const apiBaseUrl =
+  isProduction &&
+  configuredApiBaseUrl &&
+  /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(?:\/|$)/i.test(
+    configuredApiBaseUrl,
+  )
+    ? defaultApiBaseUrl
+    : (configuredApiBaseUrl ?? defaultApiBaseUrl).replace(/\/+$/, "");
 
 type ApiErrorPayload = {
   detail?: unknown;

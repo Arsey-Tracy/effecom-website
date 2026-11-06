@@ -18,13 +18,13 @@ shadcn UI components.
 
 Speech-to-text, text-to-speech, translation, and account pages call the Django
 API directly.
-The API base URL defaults to `http://localhost:8000`; set
-`NEXT_PUBLIC_EFFECOM_API_URL` in the frontend environment when the backend
-runs at a different origin. Configure the backend's `CORS_ALLOWED_ORIGINS`
-with the frontend origin and follow the backend [setup guide](../../effecom-backend/effecom/guide.md)
-to migrate the database, seed translation languages, and configure Sunbird.
-Keep Sunbird credentials on the backend; the frontend only receives the
-backend URL.
+The API base URL defaults to `http://localhost:8000` in development and
+`https://effecom-backend.onrender.com` in production. Set
+`NEXT_PUBLIC_EFFECOM_API_URL` to override the default for a different backend
+origin. Configure the backend's `CORS_ALLOWED_ORIGINS` with the frontend origin
+and follow the backend [setup guide](../../effecom-backend/effecom/guide.md) to
+migrate the database, seed translation languages, and configure Sunbird. Keep
+Sunbird credentials on the backend; the frontend only receives the backend URL.
 
 Speech-to-text accepts WAV uploads in configured languages. Video captions are
 not implemented by the backend and remain marked as in development.
