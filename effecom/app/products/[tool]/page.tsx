@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import {
   SiteFooter,
@@ -34,12 +35,45 @@ export async function generateMetadata({
   };
 }
 
-export default async function ProductPage({ params }: ProductPageProps) {
+async function ProductContent({ params }: ProductPageProps) {
   const { tool: slug } = await params;
   const tool = getTool(slug);
 
   if (!tool) notFound();
 
+  return (
+    <>
+      <p className="landing-kicker">EFFECOM / {tool.title}</p>
+      <h1>{tool.headline}</h1>
+      <p className="landing-product-description">{tool.description}</p>
+      {tool.slug === "text-to-speech" ||
+      tool.slug === "speech-to-text" ||
+      tool.slug === "translation" ? (
+        <ToolWorkspace
+          tool={
+            tool.slug === "text-to-speech"
+              ? "text-to-speech"
+              : tool.slug === "speech-to-text"
+                ? "speech-to-text"
+                : "translation"
+          }
+        />
+      ) : (
+        <ToolAvailabilityNotice tool={tool} />
+      )}
+      <Link href="/#tools" className="landing-button landing-button-primary">
+        Explore all four tools
+        <ArrowRight aria-hidden="true" className="size-4" />
+      </Link>
+    </>
+  );
+}
+
+function ProductLoading() {
+  return <p role="status">Loading tool…</p>;
+}
+
+export default function ProductPage({ params }: ProductPageProps) {
   return (
     <>
       <SiteHeader />
@@ -49,24 +83,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
             <ArrowLeft aria-hidden="true" className="size-4" />
             All tools
           </Link>
-          <p className="landing-kicker">EFFECOM / {tool.title}</p>
-          <h1>{tool.headline}</h1>
-          <p className="landing-product-description">{tool.description}</p>
-          {tool.slug === "text-to-speech" || tool.slug === "translation" ? (
-            <ToolWorkspace
-              tool={
-                tool.slug === "text-to-speech"
-                  ? "text-to-speech"
-                  : "translation"
-              }
-            />
-          ) : (
-            <ToolAvailabilityNotice tool={tool} />
-          )}
-          <Link href="/#tools" className="landing-button landing-button-primary">
-            Explore all four tools
-            <ArrowRight aria-hidden="true" className="size-4" />
-          </Link>
+          <Suspense fallback={<ProductLoading />}>
+            <ProductContent params={params} />
+          </Suspense>
         </div>
       </main>
       <SiteFooter />

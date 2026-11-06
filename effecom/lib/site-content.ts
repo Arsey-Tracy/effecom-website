@@ -20,11 +20,11 @@ export const siteContent = {
     eyebrow: "EVERY VOICE DESERVES TO BE UNDERSTOOD.",
     title: "Make every message easier to understand.",
     description:
-      "EFFECOM helps you turn text into speech, speech into text, translate between supported languages, and make videos more accessible with captions.",
+      "EFFECOM brings speech-to-text, text-to-speech, and translation together to make communication more accessible.",
     primaryAction: "Explore the tools",
     secondaryAction: "Why communication matters",
     note:
-      "Try translation and text-to-speech as a guest. Create an account to keep a private history of your requests.",
+      "Try speech-to-text, translation, and text-to-speech as a guest. Create an account to keep a private history of your requests.",
   },
   tools: [
     {
@@ -41,8 +41,8 @@ export const siteContent = {
       title: "Speech-to-Text",
       headline: "Turn spoken words into text.",
       description:
-        "Convert audio recordings into written transcripts that you can review and use.",
-      action: "Explore Speech-to-Text",
+        "Upload an audio recording and turn spoken words into a written transcript.",
+      action: "Try Speech-to-Text",
       icon: "audio",
     },
     {
@@ -59,7 +59,7 @@ export const siteContent = {
       title: "Video Captions",
       headline: "Make video content easier to follow.",
       description:
-        "Generate synchronized captions from video speech and review or edit the results.",
+        "Video captions are in development. The planned tool will make video speech easier to follow.",
       action: "Explore Video Captions",
       icon: "captions",
     },

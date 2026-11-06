@@ -15,7 +15,7 @@ type Account = {
 
 type Activity = {
   id: number;
-  tool: "tts" | "translation";
+  tool: "tts" | "stt" | "translation";
   text: string;
   language: string;
   voice: string;
@@ -114,6 +114,7 @@ export default function DashboardPage() {
           ) : (
             <>
               <div className="dashboard-shortcuts">
+                <Link href="/products/speech-to-text">Try speech-to-text</Link>
                 <Link href="/products/translation">Try translation</Link>
                 <Link href="/products/text-to-speech">Try text-to-speech</Link>
               </div>
@@ -121,7 +122,7 @@ export default function DashboardPage() {
                 <h2>Recent activity</h2>
                 {activities.length === 0 ? (
                   <p className="activity-empty">
-                    Your successful signed-in translations and speech requests
+                    Your successful signed-in speech and translation requests
                     will appear here.
                   </p>
                 ) : (
@@ -132,7 +133,9 @@ export default function DashboardPage() {
                           <h3>
                             {activity.tool === "tts"
                               ? "Text-to-Speech"
-                              : "Translation"}
+                              : activity.tool === "stt"
+                                ? "Speech-to-Text"
+                                : "Translation"}
                           </h3>
                           <time dateTime={activity.created_at}>
                             {new Date(activity.created_at).toLocaleString()}
@@ -142,6 +145,10 @@ export default function DashboardPage() {
                         {activity.tool === "tts" ? (
                           <p className="activity-meta">
                             {activity.language.toUpperCase()} · {activity.voice}
+                          </p>
+                        ) : activity.tool === "stt" ? (
+                          <p className="activity-meta">
+                            {activity.language.toUpperCase()}
                           </p>
                         ) : (
                           <p className="activity-meta">

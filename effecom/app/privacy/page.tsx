@@ -22,14 +22,12 @@ export default function PrivacyPage() {
           <p className="landing-kicker">EFFECOM / Privacy</p>
           <h1>Your privacy matters.</h1>
           <p className="landing-product-description">
-            EFFECOM&apos;s communication tools are still in development. This
-            website does not currently offer accounts or submit text, audio,
-            translations, or video for processing.
-          </p>
-          <p className="landing-product-description">
-            When tool experiences become available, we will explain what
-            information each one uses and how it is handled before you submit
-            anything.
+            EFFECOM sends the text or audio you submit to Sunbird&apos;s
+            language services to provide translation, speech-to-text, and
+            text-to-speech. Do not submit confidential or sensitive
+            information. Signed-in successful requests are saved in your
+            private activity history; guest usage is tracked against a
+            short-lived guest session.
           </p>
           <Link href="/#tools" className="landing-text-link">
             Explore the tools

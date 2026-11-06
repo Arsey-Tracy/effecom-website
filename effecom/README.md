@@ -14,6 +14,21 @@ npm run dev
 The site uses Next.js App Router, TypeScript, Tailwind CSS, and the project's
 shadcn UI components.
 
+## Backend-powered tools
+
+Speech-to-text, text-to-speech, translation, and account pages call the Django
+API directly.
+The API base URL defaults to `http://localhost:8000`; set
+`NEXT_PUBLIC_EFFECOM_API_URL` in the frontend environment when the backend
+runs at a different origin. Configure the backend's `CORS_ALLOWED_ORIGINS`
+with the frontend origin and follow the backend [setup guide](../../effecom-backend/effecom/guide.md)
+to migrate the database, seed translation languages, and configure Sunbird.
+Keep Sunbird credentials on the backend; the frontend only receives the
+backend URL.
+
+Speech-to-text accepts WAV uploads in configured languages. Video captions are
+not implemented by the backend and remain marked as in development.
+
 ## Pilot registration integration
 
 The interest form is **not connected by default**. When no endpoint is
@@ -43,9 +58,9 @@ failures, not as successful registrations.
 
 ## Owner review before launch
 
-- Confirm each feature status in `lib/site-content.ts`. Current feature labels
-  are conservatively set to **Planned**; no feature has been verified as
-  available.
+- Verify Sunbird configuration and test each provider-backed feature before
+  launch; the product page status labels do not imply that provider credentials
+  are configured in production.
 - Set a real privacy contact channel in `lib/site-content.ts` and publish an
   operational way for people to ask about, correct, or request removal of
   information before connecting registrations.

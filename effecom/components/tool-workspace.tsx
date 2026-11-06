@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { apiRequest } from "@/lib/api";
+import { ApiError, apiRequest } from "@/lib/api";
 
 type ToolOptions = {
   languages: { code: string; name: string }[];
+  stt_languages: { code: string; name: string }[];
   voices: { language: string; name: string }[];
   max_text_length: number;
 };
 
 type ToolWorkspaceProps = {
-  tool: "text-to-speech" | "translation";
+  tool: "text-to-speech" | "speech-to-text" | "translation";
 };
 
 function findResponseValue(
@@ -39,6 +40,8 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
   const [targetLanguage, setTargetLanguage] = useState("");
   const [voiceLanguage, setVoiceLanguage] = useState("");
   const [voice, setVoice] = useState("");
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [sttLanguage, setSttLanguage] = useState("");
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -62,6 +65,7 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
           setVoiceLanguage(initialVoice.language);
           setVoice(initialVoice.name);
         }
+        setSttLanguage(data.stt_languages[0]?.code ?? "");
       })
       .catch((cause: unknown) => {
         if (active) {
@@ -84,6 +88,7 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
     [options, voiceLanguage],
   );
   const isTranslation = tool === "translation";
+  const isSpeechToText = tool === "speech-to-text";
   const audioUrl = findResponseValue(result, [
     "audio_url",
     "audiourl",
@@ -95,6 +100,11 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
     "translatedtext",
     "text",
   ]);
+  const transcription = findResponseValue(result, [
+    "audio_transcription",
+    "transcription",
+    "transcript",
+  ]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -102,21 +112,74 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
     setResult(null);
     setLoading(true);
     try {
-      const payload = isTranslation
-        ? {
-            text,
-            ...(sourceLanguage ? { source_language: sourceLanguage } : {}),
-            target_language: targetLanguage,
+      let data: Record<string, unknown>;
+      if (isSpeechToText) {
+        const formData = new FormData();
+        if (!audioFile) {
+          throw new Error("Choose an audio file to transcribe.");
+        }
+        formData.append("audio", audioFile);
+        formData.append("language", sttLanguage);
+        try {
+          data = await apiRequest<Record<string, unknown>>(
+            "/api/v1/stt/",
+            { method: "POST", body: formData },
+          );
+        } catch (cause: unknown) {
+          if (!(cause instanceof ApiError) || cause.status !== 401) {
+            throw cause;
           }
-        : {
-            text,
-            language: voiceLanguage,
-            voice,
-          };
-      const data = await apiRequest<Record<string, unknown>>(
-        isTranslation ? "/api/v1/translate/" : "/api/v1/tts/",
-        { method: "POST", body: JSON.stringify(payload) },
-      );
+          await apiRequest("/api/v1/guest/session/", {
+            method: "POST",
+            body: JSON.stringify({}),
+          });
+          data = await apiRequest<Record<string, unknown>>(
+            "/api/v1/stt/",
+            { method: "POST", body: formData },
+          );
+        }
+      } else {
+        const payload = isTranslation
+          ? {
+              text,
+              ...(sourceLanguage ? { source_language: sourceLanguage } : {}),
+              target_language: targetLanguage,
+            }
+          : {
+              text,
+              language: voiceLanguage,
+              voice,
+            };
+        const request: RequestInit = {
+          method: "POST",
+          body: JSON.stringify(payload),
+        };
+        if (isTranslation) {
+          try {
+            data = await apiRequest<Record<string, unknown>>(
+              "/api/v1/translations/",
+              request,
+            );
+          } catch (cause: unknown) {
+            if (!(cause instanceof ApiError) || cause.status !== 401) {
+              throw cause;
+            }
+            await apiRequest("/api/v1/guest/session/", {
+              method: "POST",
+              body: JSON.stringify({}),
+            });
+            data = await apiRequest<Record<string, unknown>>(
+              "/api/v1/translations/",
+              request,
+            );
+          }
+        } else {
+          data = await apiRequest<Record<string, unknown>>(
+            "/api/v1/tts/",
+            request,
+          );
+        }
+      }
       setResult(data);
     } catch (cause: unknown) {
       setError(
@@ -132,13 +195,19 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
   return (
     <section className="tool-workspace" aria-labelledby="tool-form-title">
       <h2 id="tool-form-title">
-        {isTranslation ? "Translate a message" : "Listen to your text"}
+        {isTranslation
+          ? "Translate a message"
+          : isSpeechToText
+            ? "Transcribe an audio recording"
+            : "Listen to your text"}
       </h2>
       <p className="tool-workspace-intro">
         Try it without an account. Sign in if you want successful requests to
         appear in your activity history.
         {isTranslation &&
           " Choose a source language or let Sunbird detect it automatically. Complete sentences work best."}
+        {isSpeechToText &&
+          " Upload a WAV recording in a supported language."}
       </p>
       <form className="tool-form" onSubmit={submit}>
         {isTranslation ? (
@@ -186,6 +255,22 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
               </select>
             </label>
           </div>
+        ) : isSpeechToText ? (
+          <label>
+            Audio language
+            <select
+              required
+              value={sttLanguage}
+              onChange={(event) => setSttLanguage(event.target.value)}
+              disabled={!options || options.stt_languages.length === 0}
+            >
+              {options?.stt_languages.map(({ code, name }) => (
+                <option value={code} key={code}>
+                  {name} ({code})
+                </option>
+              ))}
+            </select>
+          </label>
         ) : (
           <div className="tool-language-row">
             <label>
@@ -231,34 +316,59 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
             </label>
           </div>
         )}
-        <label>
-          Text
-          <textarea
-            required
-            maxLength={options?.max_text_length ?? 2000}
-            rows={5}
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            placeholder={
-              isTranslation
-                ? "Write the message you want to translate"
-                : "Write something you would like to hear"
-            }
-          />
-          <span className="tool-character-count">
-            {text.length}/{options?.max_text_length ?? 2000}
-          </span>
-        </label>
+        {isSpeechToText ? (
+          <label>
+            Audio recording
+            <input
+              required
+              type="file"
+              accept="audio/wav,.wav"
+              onChange={(event) =>
+                setAudioFile(event.target.files?.[0] ?? null)
+              }
+            />
+            {audioFile && (
+              <span className="tool-character-count">
+                {audioFile.name} · {(audioFile.size / (1024 * 1024)).toFixed(1)} MB
+              </span>
+            )}
+          </label>
+        ) : (
+          <label>
+            Text
+            <textarea
+              required
+              maxLength={options?.max_text_length ?? 2000}
+              rows={5}
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              placeholder={
+                isTranslation
+                  ? "Write the message you want to translate"
+                  : "Write something you would like to hear"
+              }
+            />
+            <span className="tool-character-count">
+              {text.length}/{options?.max_text_length ?? 2000}
+            </span>
+          </label>
+        )}
         <button
           className="landing-button landing-button-primary tool-submit"
           type="submit"
-          disabled={loading || !options || !text.trim()}
+          disabled={
+            loading ||
+            !options ||
+            (isSpeechToText ? !audioFile : !text.trim())
+          }
         >
           {loading
             ? "Working…"
             : isTranslation
               ? "Translate text"
-              : "Generate speech"}
+              : isSpeechToText
+                ? "Transcribe audio"
+                : "Generate speech"}
         </button>
       </form>
 
@@ -269,13 +379,21 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
       )}
       {result && (
         <section className="tool-result" aria-live="polite">
-          <h3>{isTranslation ? "Translation result" : "Your audio"}</h3>
+          <h3>
+            {isTranslation
+              ? "Translation result"
+              : isSpeechToText
+                ? "Transcription"
+                : "Your audio"}
+          </h3>
           {audioUrl && (
             <audio controls preload="none" src={audioUrl}>
               Your browser does not support audio playback.
             </audio>
           )}
-          {translatedText && isTranslation ? (
+          {transcription && isSpeechToText ? (
+            <p className="tool-translated-text">{transcription}</p>
+          ) : translatedText && isTranslation ? (
             <p className="tool-translated-text">{translatedText}</p>
           ) : (
             <pre>{JSON.stringify(result, null, 2)}</pre>

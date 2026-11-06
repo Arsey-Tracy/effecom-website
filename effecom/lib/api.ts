@@ -3,8 +3,8 @@ const apiBaseUrl = (
 ).replace(/\/+$/, "");
 
 type ApiErrorPayload = {
-  detail?: string;
-  error?: string;
+  detail?: unknown;
+  error?: unknown;
   [key: string]: unknown;
 };
 
@@ -20,23 +20,50 @@ export class ApiError extends Error {
 
 let csrfToken: string | null = null;
 
+function collectMessages(value: unknown, field = ""): string[] {
+  if (typeof value === "string") {
+    return [field ? `${field}: ${value}` : value];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectMessages(item, field));
+  }
+  if (value && typeof value === "object") {
+    return Object.entries(value).flatMap(([key, nested]) =>
+      collectMessages(nested, field ? `${field}.${key}` : key),
+    );
+  }
+  return [];
+}
+
 async function readError(response: Response) {
   const payload = (await response.json().catch(() => null)) as
     | ApiErrorPayload
     | null;
   if (!payload) return `Request failed (${response.status}).`;
 
-  const detail = payload.detail ?? payload.error;
+  const apiError = payload.error;
+  if (apiError && typeof apiError === "object" && !Array.isArray(apiError)) {
+    const structuredError = apiError as {
+      message?: unknown;
+      details?: unknown;
+    };
+    const message =
+      typeof structuredError.message === "string"
+        ? structuredError.message
+        : "";
+    const details = collectMessages(structuredError.details);
+    return [...new Set([message, ...details].filter(Boolean))].join(" ") ||
+      `Request failed (${response.status}).`;
+  }
+
+  const detail = payload.detail ?? apiError;
   if (typeof detail === "string") return detail;
 
-  const messages = Object.entries(payload).flatMap(([field, value]) => {
-    if (typeof value === "string") return [`${field}: ${value}`];
-    if (Array.isArray(value)) {
-      return value.filter((item): item is string => typeof item === "string")
-        .map((item) => `${field}: ${item}`);
-    }
-    return [];
-  });
+  const messages = collectMessages(
+    Object.fromEntries(
+      Object.entries(payload).filter(([field]) => field !== "detail"),
+    ),
+  );
   return messages.join(" ") || `Request failed (${response.status}).`;
 }
 
@@ -58,7 +85,9 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
-  if (init.body && !headers.has("Content-Type")) {
+  const isFormData =
+    typeof FormData !== "undefined" && init.body instanceof FormData;
+  if (init.body && !isFormData && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
   if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {

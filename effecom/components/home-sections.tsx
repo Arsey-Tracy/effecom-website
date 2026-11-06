@@ -115,7 +115,9 @@ export function FeatureSection() {
                 <ArrowRight aria-hidden="true" className="size-4" />
               </Link>
               <span className="landing-tool-status">
-                {tool.slug === "text-to-speech" || tool.slug === "translation"
+                {tool.slug === "text-to-speech" ||
+                tool.slug === "speech-to-text" ||
+                tool.slug === "translation"
                   ? "Available to try"
                   : "In development"}
               </span>
@@ -123,8 +125,8 @@ export function FeatureSection() {
           ))}
         </div>
         <p className="landing-tools-note">
-          Translation and text-to-speech are ready to try without an account.
-          Speech-to-text and video captions are still in development.
+          Speech-to-text, translation, and text-to-speech are ready to try
+          without an account. Video captions are still in development.
         </p>
       </div>
     </section>
@@ -171,8 +173,8 @@ export function FinalCTA() {
           <h2>Better communication starts with understanding.</h2>
           <p>
             Explore EFFECOM and experience simpler, more accessible
-            communication. Try translation and text-to-speech as a guest, or
-            create an account to keep a private activity history.
+            communication. Try speech-to-text, translation, and text-to-speech
+            as a guest, or create an account to keep a private activity history.
           </p>
         </div>
         <div className="landing-cta-action">
