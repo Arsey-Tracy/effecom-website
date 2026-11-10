@@ -22,7 +22,7 @@ export function AccountForm({ mode }: AccountFormProps) {
   function validate() {
     const errors: Record<string, string> = {};
     if (!email.trim()) errors.email = "Email is required.";
-    else if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
       errors.email = "Enter a valid email address.";
     if (!password) errors.password = "Password is required.";
     else if (isRegister && password.length < 8)
