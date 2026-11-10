@@ -15,6 +15,7 @@ export class ApiError extends Error {
 }
 
 let csrfToken: string | null = null;
+const MAX_STT_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 function collectMessages(value: unknown, field = ""): string[] {
   if (typeof value === "string") {
@@ -81,9 +82,24 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
-  const isFormData =
-    typeof FormData !== "undefined" && init.body instanceof FormData;
-  if (init.body && !isFormData && !headers.has("Content-Type")) {
+  const formData =
+    typeof FormData !== "undefined" && init.body instanceof FormData
+      ? init.body
+      : null;
+  if (path === "/api/v1/stt/" && formData) {
+    const audio = formData.get("audio");
+    if (
+      typeof Blob !== "undefined" &&
+      audio instanceof Blob &&
+      audio.size > MAX_STT_UPLOAD_BYTES
+    ) {
+      throw new ApiError(
+        "Audio recordings must be 4 MB or smaller when using the hosted app.",
+        413,
+      );
+    }
+  }
+  if (init.body && !formData && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
   if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {

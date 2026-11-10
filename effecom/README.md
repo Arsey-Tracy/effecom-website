@@ -28,8 +28,13 @@ for trusted CSRF origins) with the frontend origin, and follow the backend
 seed translation languages, and configure Sunbird. Keep Sunbird credentials on
 the backend.
 
-Speech-to-text accepts WAV uploads in configured languages. Video captions are
-not implemented by the backend and remain marked as in development.
+The API proxy runs as a Vercel Node.js Function with a 240-second maximum
+duration, allowing TTS and STT to wait for the backend provider. The backend's
+Render Gunicorn timeout must be at least 240 seconds. Vercel Functions limit
+request bodies to 4.5 MB, so hosted STT uploads are capped at 4 MB; larger
+uploads require direct-to-object-storage handling. Speech-to-text accepts WAV
+uploads in configured languages. Video captions are not implemented by the
+backend and remain marked as in development.
 
 ## Pilot registration integration
 
