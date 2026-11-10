@@ -1,17 +1,3 @@
-const isProduction = process.env.NODE_ENV === "production";
-const defaultApiBaseUrl = isProduction
-  ? "https://effecom-backend.onrender.com"
-  : "http://localhost:8000";
-const configuredApiBaseUrl = process.env.NEXT_PUBLIC_EFFECOM_API_URL;
-const apiBaseUrl =
-  isProduction &&
-  configuredApiBaseUrl &&
-  /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(?:\/|$)/i.test(
-    configuredApiBaseUrl,
-  )
-    ? defaultApiBaseUrl
-    : (configuredApiBaseUrl ?? defaultApiBaseUrl).replace(/\/+$/, "");
-
 type ApiErrorPayload = {
   detail?: unknown;
   error?: unknown;
@@ -78,7 +64,7 @@ async function readError(response: Response) {
 }
 
 async function getCsrfToken() {
-  const response = await fetch(`${apiBaseUrl}/api/v1/auth/csrf/`, {
+  const response = await fetch("/api/v1/auth/csrf/", {
     credentials: "include",
   });
   if (!response.ok) {
@@ -104,7 +90,7 @@ export async function apiRequest<T>(
     headers.set("X-CSRFToken", await getCsrfToken());
   }
 
-  const response = await fetch(`${apiBaseUrl}${path}`, {
+  const response = await fetch(path, {
     ...init,
     method,
     headers,
