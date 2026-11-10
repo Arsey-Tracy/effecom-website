@@ -15,12 +15,28 @@ export function AccountForm({ mode }: AccountFormProps) {
   const [firstName, setFirstName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const isRegister = mode === "register";
+
+  function validate() {
+    const errors: Record<string, string> = {};
+    if (!email.trim()) errors.email = "Email is required.";
+    else if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))
+      errors.email = "Enter a valid email address.";
+    if (!password) errors.password = "Password is required.";
+    else if (isRegister && password.length < 8)
+      errors.password = "Password must be at least 8 characters.";
+    if (isRegister && !firstName.trim())
+      errors.firstName = "First name is required.";
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    if (!validate()) return;
     setLoading(true);
     try {
       await apiRequest(
@@ -29,8 +45,8 @@ export function AccountForm({ mode }: AccountFormProps) {
           method: "POST",
           body: JSON.stringify(
             isRegister
-              ? { email, first_name: firstName, password }
-              : { email, password },
+              ? { email: email.trim(), first_name: firstName.trim(), password }
+              : { email: email.trim(), password },
           ),
         },
       );
@@ -65,8 +81,14 @@ export function AccountForm({ mode }: AccountFormProps) {
               maxLength={150}
               required
               value={firstName}
-              onChange={(event) => setFirstName(event.target.value)}
+              onChange={(event) => {
+                setFirstName(event.target.value);
+                setFieldErrors((e) => ({ ...e, firstName: "" }));
+              }}
             />
+            {fieldErrors.firstName && (
+              <span className="tool-error">{fieldErrors.firstName}</span>
+            )}
           </label>
         )}
         <label>
@@ -76,8 +98,14 @@ export function AccountForm({ mode }: AccountFormProps) {
             type="email"
             required
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              setFieldErrors((e) => ({ ...e, email: "" }));
+            }}
           />
+          {fieldErrors.email && (
+            <span className="tool-error">{fieldErrors.email}</span>
+          )}
         </label>
         <label>
           Password
@@ -87,8 +115,14 @@ export function AccountForm({ mode }: AccountFormProps) {
             minLength={isRegister ? 8 : undefined}
             required
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={(event) => {
+              setPassword(event.target.value);
+              setFieldErrors((e) => ({ ...e, password: "" }));
+            }}
           />
+          {fieldErrors.password && (
+            <span className="tool-error">{fieldErrors.password}</span>
+          )}
         </label>
         {error && (
           <p className="tool-error" role="alert">
@@ -100,11 +134,7 @@ export function AccountForm({ mode }: AccountFormProps) {
           type="submit"
           disabled={loading}
         >
-          {loading
-            ? "Please wait…"
-            : isRegister
-              ? "Create account"
-              : "Sign in"}
+          {loading ? "Please wait…" : isRegister ? "Create account" : "Sign in"}
         </button>
       </form>
       <p className="account-switch">

@@ -57,10 +57,17 @@ export function SiteHeader() {
         </Link>
 
         <nav aria-label="Main navigation" className="landing-nav">
-          <Link href="/" className="landing-nav-link">
+          <Link
+            href="/"
+            className="landing-nav-link"
+            aria-current={pathname === "/" ? "page" : undefined}
+          >
             Home
           </Link>
-          <details className="landing-products-menu">
+          <details
+            className="landing-products-menu"
+            data-active={pathname.startsWith("/products/") || undefined}
+          >
             <summary>
               Products
               <ChevronDown aria-hidden="true" className="size-4" />
@@ -71,6 +78,7 @@ export function SiteHeader() {
                   href={`/products/${tool.slug}`}
                   key={tool.slug}
                   className="landing-products-link"
+                  aria-current={pathname === `/products/${tool.slug}` ? "page" : undefined}
                 >
                   <span>{tool.title}</span>
                   <span>{tool.headline}</span>
@@ -78,15 +86,19 @@ export function SiteHeader() {
               ))}
             </div>
           </details>
-          {siteContent.navigation.slice(1).map((item) => (
-            <Link
-              key={item.label}
-              href={localHref(item.href, pathname)}
-              className="landing-nav-link"
-            >
-              {item.label}
-            </Link>
-          ))}
+          {siteContent.navigation.slice(1).map((item) => {
+            const href = localHref(item.href, pathname);
+            return (
+              <Link
+                key={item.label}
+                href={href}
+                className="landing-nav-link"
+                aria-current={pathname === href ? "page" : undefined}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <Link className="landing-header-cta" href={localHref("#tools", pathname)}>
@@ -117,7 +129,7 @@ export function SiteHeader() {
         hidden={!menuOpen}
         className="landing-mobile-nav"
       >
-        <Link href="/" onClick={closeMenu}>Home</Link>
+        <Link href="/" onClick={closeMenu} aria-current={pathname === "/" ? "page" : undefined}>Home</Link>
         <a href={localHref("#tools", pathname)} onClick={closeMenu}>Products</a>
         <div className="landing-mobile-products">
           {siteContent.tools.map((tool) => (
@@ -125,20 +137,25 @@ export function SiteHeader() {
               href={`/products/${tool.slug}`}
               key={tool.slug}
               onClick={closeMenu}
+              aria-current={pathname === `/products/${tool.slug}` ? "page" : undefined}
             >
               {tool.title}
             </Link>
           ))}
         </div>
-        {siteContent.navigation.slice(1).map((item) => (
-          <Link
-            href={localHref(item.href, pathname)}
-            key={item.label}
-            onClick={closeMenu}
-          >
-            {item.label}
-          </Link>
-        ))}
+        {siteContent.navigation.slice(1).map((item) => {
+          const href = localHref(item.href, pathname);
+          return (
+            <Link
+              href={href}
+              key={item.label}
+              onClick={closeMenu}
+              aria-current={pathname === href ? "page" : undefined}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
         <Link
           className="landing-mobile-cta"
           href={localHref("#tools", pathname)}

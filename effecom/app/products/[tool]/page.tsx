@@ -26,6 +26,8 @@ export function generateStaticParams() {
 export async function generateMetadata({
   params,
 }: ProductPageProps): Promise<Metadata> {
+  "use cache";
+
   const { tool: slug } = await params;
   const tool = getTool(slug);
 
