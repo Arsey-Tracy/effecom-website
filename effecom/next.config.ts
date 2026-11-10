@@ -11,11 +11,13 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  skipTrailingSlashRedirect: true,
+
   async rewrites() {
     return [
       {
         source: "/api/v1/:path*",
-        destination: `${backendOrigin}/api/v1/:path*`,
+        destination: `${backendOrigin}/api/v1/:path*/`,
       },
     ];
   },
