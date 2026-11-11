@@ -1,3 +1,8 @@
+import axios, {
+  type AxiosRequestConfig,
+  type InternalAxiosRequestConfig,
+} from "axios";
+
 type ApiErrorPayload = {
   detail?: unknown;
   error?: unknown;
@@ -14,8 +19,20 @@ export class ApiError extends Error {
   }
 }
 
-let csrfToken: string | null = null;
 const MAX_STT_UPLOAD_BYTES = 4 * 1024 * 1024;
+const apiClient = axios.create({
+  baseURL: "/",
+  withCredentials: true,
+  withXSRFToken: true,
+  xsrfCookieName: "csrftoken",
+  xsrfHeaderName: "X-CSRFToken",
+});
+
+type RetryableRequestConfig = InternalAxiosRequestConfig & {
+  _authRetry?: boolean;
+};
+
+let refreshRequest: Promise<void> | null = null;
 
 function collectMessages(value: unknown, field = ""): string[] {
   if (typeof value === "string") {
@@ -32,13 +49,13 @@ function collectMessages(value: unknown, field = ""): string[] {
   return [];
 }
 
-async function readError(response: Response) {
-  const payload = (await response.json().catch(() => null)) as
-    | ApiErrorPayload
-    | null;
-  if (!payload) return `Request failed (${response.status}).`;
+function readError(payload: unknown, status: number) {
+  if (!payload || typeof payload !== "object") {
+    return `Request failed (${status}).`;
+  }
+  const errorPayload = payload as ApiErrorPayload;
 
-  const apiError = payload.error;
+  const apiError = errorPayload.error;
   if (apiError && typeof apiError === "object" && !Array.isArray(apiError)) {
     const structuredError = apiError as {
       message?: unknown;
@@ -50,30 +67,94 @@ async function readError(response: Response) {
         : "";
     const details = collectMessages(structuredError.details);
     return [...new Set([message, ...details].filter(Boolean))].join(" ") ||
-      `Request failed (${response.status}).`;
+      `Request failed (${status}).`;
   }
 
-  const detail = payload.detail ?? apiError;
+  const detail = errorPayload.detail ?? apiError;
   if (typeof detail === "string") return detail;
 
   const messages = collectMessages(
     Object.fromEntries(
-      Object.entries(payload).filter(([field]) => field !== "detail"),
+      Object.entries(errorPayload).filter(([field]) => field !== "detail"),
     ),
   );
-  return messages.join(" ") || `Request failed (${response.status}).`;
+  return messages.join(" ") || `Request failed (${status}).`;
 }
 
-async function getCsrfToken() {
-  const response = await fetch("/api/v1/auth/csrf/", {
-    credentials: "include",
-  });
-  if (!response.ok) {
-    throw new ApiError(await readError(response), response.status);
+function toApiError(error: unknown): ApiError {
+  if (error instanceof ApiError) return error;
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status ?? 0;
+    const message = error.response
+      ? readError(error.response.data, status)
+      : error.message || "The API could not be reached.";
+    return new ApiError(message, status);
   }
-  const payload = (await response.json()) as { csrfToken: string };
-  csrfToken = payload.csrfToken;
-  return csrfToken;
+  return new ApiError(
+    error instanceof Error ? error.message : "The request could not be completed.",
+    0,
+  );
+}
+
+function isAuthEndpoint(url?: string) {
+  return /\/api\/v1\/auth\/(?:csrf|login|register|logout|token\/refresh)\/?$/.test(
+    url ?? "",
+  );
+}
+
+apiClient.interceptors.request.use(async (config) => {
+  const method = (config.method ?? "GET").toUpperCase();
+  const isCsrfBootstrap = /\/api\/v1\/auth\/csrf\/?$/.test(config.url ?? "");
+  if (
+    ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
+    !isCsrfBootstrap
+  ) {
+    try {
+      await apiClient.get<{ csrfToken: string }>("/api/v1/auth/csrf/");
+    } catch (error) {
+      throw toApiError(error);
+    }
+  }
+  return config;
+});
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error: unknown) => {
+    if (!axios.isAxiosError(error)) throw toApiError(error);
+    const config = error.config as RetryableRequestConfig | undefined;
+    if (
+      error.response?.status === 401 &&
+      config &&
+      !config._authRetry &&
+      !isAuthEndpoint(config.url)
+    ) {
+      config._authRetry = true;
+      try {
+        if (!refreshRequest) {
+          refreshRequest = apiClient
+            .post("/api/v1/auth/token/refresh/")
+            .then(() => undefined)
+            .finally(() => {
+              refreshRequest = null;
+            });
+        }
+        await refreshRequest;
+        return apiClient.request(config);
+      } catch {
+        throw toApiError(error);
+      }
+    }
+    throw toApiError(error);
+  },
+);
+
+function getHeaders(headers: HeadersInit | undefined) {
+  const result: Record<string, string> = {};
+  new Headers(headers).forEach((value, key) => {
+    result[key] = value;
+  });
+  return result;
 }
 
 export async function apiRequest<T>(
@@ -81,12 +162,19 @@ export async function apiRequest<T>(
   init: RequestInit = {},
 ): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
-  const headers = new Headers(init.headers);
+  const headers = getHeaders(init.headers);
   const formData =
     typeof FormData !== "undefined" && init.body instanceof FormData
       ? init.body
       : null;
-  if (path === "/api/v1/stt/" && formData) {
+  if (
+    init.body &&
+    !formData &&
+    !Object.keys(headers).some((header) => header.toLowerCase() === "content-type")
+  ) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (formData && path === "/api/v1/stt/") {
     const audio = formData.get("audio");
     if (
       typeof Blob !== "undefined" &&
@@ -99,22 +187,19 @@ export async function apiRequest<T>(
       );
     }
   }
-  if (init.body && !formData && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-  if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
-    headers.set("X-CSRFToken", await getCsrfToken());
-  }
 
-  const response = await fetch(path, {
-    ...init,
+  const config: AxiosRequestConfig = {
+    url: path,
     method,
+    data: init.body,
     headers,
-    credentials: "include",
-  });
-  if (!response.ok) {
-    throw new ApiError(await readError(response), response.status);
+    signal: init.signal ?? undefined,
+  };
+  try {
+    const response = await apiClient.request<T>(config);
+    if (response.status === 204) return undefined as T;
+    return response.data;
+  } catch (error) {
+    throw toApiError(error);
   }
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
 }
