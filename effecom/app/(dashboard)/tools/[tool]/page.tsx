@@ -6,7 +6,11 @@ import { ToolWorkspace } from "@/components/tool-workspace";
 const toolDetails = {
   "speech-to-text": { title: "Speech to text", description: "Turn a supported WAV recording into a written transcript." },
   "text-to-speech": { title: "Text to speech", description: "Create spoken audio from your text using a supported voice." },
-  translation: { title: "Translation", description: "Translate text between languages supported by EFFECOM." },
+  translation: {
+    title: "Translation",
+    description:
+      "Translate text between supported languages and optionally hear the result spoken.",
+  },
 } as const;
 
 type ToolSlug = keyof typeof toolDetails;

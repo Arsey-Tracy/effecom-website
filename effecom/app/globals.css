@@ -1963,6 +1963,24 @@
   gap: 1rem;
 }
 
+.tool-form .tool-speech-option {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.65rem;
+  cursor: pointer;
+}
+
+.tool-form .tool-speech-option input {
+  width: 1rem;
+  min-height: 1rem;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  accent-color: var(--forest);
+}
+
 .tool-character-count {
   justify-self: end;
   color: var(--ink-soft);

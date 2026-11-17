@@ -40,11 +40,17 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
   const [targetLanguage, setTargetLanguage] = useState("");
   const [voiceLanguage, setVoiceLanguage] = useState("");
   const [voice, setVoice] = useState("");
+  const [translationVoice, setTranslationVoice] = useState("");
+  const [speakTranslation, setSpeakTranslation] = useState(false);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [sttLanguage, setSttLanguage] = useState("");
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [speechResult, setSpeechResult] =
+    useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState("");
+  const [speechError, setSpeechError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [speechLoading, setSpeechLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -60,6 +66,10 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
           "";
         setSourceLanguage(initialSource);
         setTargetLanguage(initialTarget);
+        setTranslationVoice(
+          data.voices.find(({ language }) => language === initialTarget)?.name ??
+            "",
+        );
         const initialVoice = data.voices[0];
         if (initialVoice) {
           setVoiceLanguage(initialVoice.language);
@@ -87,9 +97,16 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
       [],
     [options, voiceLanguage],
   );
+  const translationVoices = useMemo(
+    () =>
+      options?.voices.filter(({ language }) => language === targetLanguage) ??
+      [],
+    [options, targetLanguage],
+  );
   const isTranslation = tool === "translation";
   const isSpeechToText = tool === "speech-to-text";
-  const audioUrl = findResponseValue(result, [
+  const busy = loading || speechLoading;
+  const audioUrl = findResponseValue(isTranslation ? speechResult : result, [
     "audio_url",
     "audiourl",
     "url",
@@ -106,10 +123,51 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
     "transcript",
   ]);
 
+  function clearTranslationResult() {
+    setResult(null);
+    setSpeechResult(null);
+    setError("");
+    setSpeechError("");
+  }
+
+  async function generateSpeech(
+    speechText: string,
+    language: string,
+    selectedVoice: string,
+  ) {
+    setSpeechError("");
+    setSpeechResult(null);
+    setSpeechLoading(true);
+    try {
+      const data = await apiRequest<Record<string, unknown>>(
+        "/api/v1/tts/",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            text: speechText,
+            language,
+            voice: selectedVoice,
+          }),
+        },
+      );
+      setSpeechResult(data);
+    } catch (cause: unknown) {
+      setSpeechError(
+        cause instanceof Error
+          ? cause.message
+          : "Speech generation could not be completed.",
+      );
+    } finally {
+      setSpeechLoading(false);
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setSpeechError("");
     setResult(null);
+    setSpeechResult(null);
     setLoading(true);
     try {
       let data: Record<string, unknown>;
@@ -173,14 +231,35 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
               request,
             );
           }
+          setResult(data);
+          if (speakTranslation) {
+            const textToSpeak = findResponseValue(data, [
+              "translated_text",
+              "translatedtext",
+            ]);
+            if (textToSpeak) {
+              await generateSpeech(
+                textToSpeak,
+                targetLanguage,
+                translationVoice,
+              );
+            } else {
+              setSpeechError(
+                "The translation was returned without text to read aloud.",
+              );
+            }
+          }
         } else {
           data = await apiRequest<Record<string, unknown>>(
             "/api/v1/tts/",
             request,
           );
+          setResult(data);
         }
       }
-      setResult(data);
+      if (isSpeechToText) {
+        setResult(data);
+      }
     } catch (cause: unknown) {
       setError(
         cause instanceof Error
@@ -205,7 +284,7 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
         Try it without an account. Sign in if you want successful requests to
         appear in your activity history.
         {isTranslation &&
-          " Choose a source language or let Sunbird detect it automatically. Complete sentences work best."}
+          " Choose a source language or let Sunbird detect it automatically. You can also generate spoken audio when a voice is available for the destination language."}
         {isSpeechToText &&
           " Upload a WAV recording in a supported language."}
       </p>
@@ -220,14 +299,20 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
                   const language = event.target.value;
                   setSourceLanguage(language);
                   if (language && language === targetLanguage) {
-                    setTargetLanguage(
-                      options?.languages.find(
-                        ({ code }) => code !== language,
-                      )?.code ?? "",
+                    const nextLanguage = options?.languages.find(
+                      ({ code }) => code !== language,
+                    )?.code ?? "";
+                    setTargetLanguage(nextLanguage);
+                    setTranslationVoice(
+                      options?.voices.find(
+                        ({ language: voiceCode }) =>
+                          voiceCode === nextLanguage,
+                      )?.name ?? "",
                     );
                   }
+                  clearTranslationResult();
                 }}
-                disabled={!options}
+                disabled={!options || busy}
               >
                 <option value="">Detect automatically</option>
                 {options?.languages.map(({ code, name }) => (
@@ -242,8 +327,17 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
               <select
                 required
                 value={targetLanguage}
-                onChange={(event) => setTargetLanguage(event.target.value)}
-                disabled={!options}
+                onChange={(event) => {
+                  const language = event.target.value;
+                  setTargetLanguage(language);
+                  setTranslationVoice(
+                    options?.voices.find(
+                      ({ language: voiceCode }) => voiceCode === language,
+                    )?.name ?? "",
+                  );
+                  clearTranslationResult();
+                }}
+                disabled={!options || busy}
               >
                 {options?.languages
                   .filter(({ code }) => !sourceLanguage || code !== sourceLanguage)
@@ -262,7 +356,7 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
               required
               value={sttLanguage}
               onChange={(event) => setSttLanguage(event.target.value)}
-              disabled={!options || options.stt_languages.length === 0}
+              disabled={!options || options.stt_languages.length === 0 || busy}
             >
               {options?.stt_languages.map(({ code, name }) => (
                 <option value={code} key={code}>
@@ -286,7 +380,7 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
                       ?.name ?? "",
                   );
                 }}
-                disabled={!options}
+                disabled={!options || busy}
               >
                 {[...new Set(options?.voices.map(({ language }) => language))].map(
                   (language) => (
@@ -305,7 +399,7 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
                 required
                 value={voice}
                 onChange={(event) => setVoice(event.target.value)}
-                disabled={voices.length === 0}
+                disabled={voices.length === 0 || busy}
               >
                 {voices.map(({ name }) => (
                   <option value={name} key={name}>
@@ -315,6 +409,54 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
               </select>
             </label>
           </div>
+        )}
+        {isTranslation && (
+          <>
+            <label className="tool-speech-option">
+              <input
+                type="checkbox"
+                checked={speakTranslation}
+                onChange={(event) => setSpeakTranslation(event.target.checked)}
+                disabled={!options || options.voices.length === 0 || busy}
+              />
+              <span>Also generate spoken audio</span>
+            </label>
+            {speakTranslation && translationVoices.length > 0 && (
+              <label>
+                Voice for{" "}
+                {options?.languages.find(
+                  ({ code }) => code === targetLanguage,
+                )?.name ?? targetLanguage}
+                <select
+                  required
+                  value={translationVoice}
+                  onChange={(event) => {
+                    setTranslationVoice(event.target.value);
+                    setSpeechResult(null);
+                    setSpeechError("");
+                  }}
+                  disabled={busy}
+                >
+                  {translationVoices.map(({ name }) => (
+                    <option value={name} key={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {speakTranslation && translationVoices.length === 0 && (
+              <p className="tool-result-note" role="status">
+                Spoken audio is not configured for this destination language.
+                Choose another destination or turn off spoken audio.
+              </p>
+            )}
+            {options && options.voices.length === 0 && (
+              <p className="tool-result-note" role="status">
+                Spoken audio is not currently available.
+              </p>
+            )}
+          </>
         )}
         {isSpeechToText ? (
           <label>
@@ -326,6 +468,7 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
               onChange={(event) =>
                 setAudioFile(event.target.files?.[0] ?? null)
               }
+              disabled={busy}
             />
             {audioFile && (
               <span className="tool-character-count">
@@ -341,7 +484,13 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
               maxLength={options?.max_text_length ?? 2000}
               rows={5}
               value={text}
-              onChange={(event) => setText(event.target.value)}
+              onChange={(event) => {
+                setText(event.target.value);
+                if (isTranslation) {
+                  clearTranslationResult();
+                }
+              }}
+              disabled={busy}
               placeholder={
                 isTranslation
                   ? "Write the message you want to translate"
@@ -357,15 +506,20 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
           className="landing-button landing-button-primary tool-submit"
           type="submit"
           disabled={
-            loading ||
+            busy ||
             !options ||
-            (isSpeechToText ? !audioFile : !text.trim())
+            (isSpeechToText ? !audioFile : !text.trim()) ||
+            (isTranslation &&
+              speakTranslation &&
+              (!translationVoice || translationVoices.length === 0))
           }
         >
           {loading
             ? "Working…"
             : isTranslation
-              ? "Translate text"
+              ? speakTranslation
+                ? "Translate and speak"
+                : "Translate text"
               : isSpeechToText
                 ? "Transcribe audio"
                 : "Generate speech"}
@@ -375,6 +529,11 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
       {error && (
         <p className="tool-error" role="alert">
           {error}
+        </p>
+      )}
+      {speechError && isTranslation && (
+        <p className="tool-error" role="alert">
+          Audio could not be generated: {speechError}
         </p>
       )}
       {result && (
@@ -403,6 +562,36 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
               The provider returned this response:
             </p>
           )}
+          {isTranslation && speechLoading && (
+            <p className="tool-result-note" role="status">
+              Generating spoken audio…
+            </p>
+          )}
+          {isTranslation && speechResult && !audioUrl && (
+            <pre>{JSON.stringify(speechResult, null, 2)}</pre>
+          )}
+          {isTranslation &&
+            speakTranslation &&
+            translatedText &&
+            !audioUrl &&
+            !speechLoading &&
+            !loading &&
+            translationVoice && (
+              <button
+                className="landing-button landing-button-primary tool-submit"
+                type="button"
+                disabled={speechLoading}
+                onClick={() =>
+                  void generateSpeech(
+                    translatedText,
+                    targetLanguage,
+                    translationVoice,
+                  )
+                }
+              >
+                {speechError ? "Retry audio" : "Generate audio"}
+              </button>
+            )}
         </section>
       )}
     </section>
